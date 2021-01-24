@@ -1,76 +1,3 @@
-Basic gulp-scss template
-=====================
-
-### Возможности
-1. Компиляция из scss в css
-2. Минификация css
-3. Добавление вендорных префиксов в css
-4. Автоматическое обновление браузера
-5. Минификация и конкатенация JavaScript
-6. Оптимизация картинок
-7. Создание спрайтов
-
-
-**Процесс установки.**
-
-1. Клонируем репозиторий
-```js
-git clone https://github.com/dmgame/template.git
-```
-2. Перейдите в склонированную папку или откройте е в редакторе кода
-```js
-cd template
-```
-
-3. Разворачивание проекта (установка всех модулей). У вас должен быть установлен nodejs и gulp глобально
-```js
- npm up
-```
----
-**Запуск gulp**
-
-1. Запуск gulp. Запустится таск default
-```js
- gulp
-```
----
-***Установка gulp глобально `(если он не установлен)`***
-1. Установите nodejs по ссылке [Nodejs](https://nodejs.org/uk/)
-
-2. Установите gulp глобально
-```js
-npm i gulp -g
-```
----
-***Привяжите к своему репозиторию***
-1. Создайте новый репозиторий на github
-
-2. Подвяжите текущий template к своему репозиторию
-```js
-git remote set-url origin "ссылка на ваш репозиторий"
-```
----
-
-
-**Структура папок**
-
-Название папок  | Содержание файла
-----------------|----------------------
-app             | Директория с готовым проектом
-app/css         | Готовые стили к продакшену
-app/js          | Готовый js к продакшену
-app/img         | Готовые картинки к продакшену
-app/fonts       | Шрифты
-src             | Директория с исходными файлыми
-src/css         | Исходные стили, здесь мы пишем наши стили и они будут конвертироваться в app/css
-src/img         | Исходные картинки, они будут минифицироваться и перегоняться в app/img
-src/js          | Исходный js будет минифицироваться и переносится в app/js
-src/sprite      | Папка для нарезанных картинок под будущие спрайты, после конветрации попадут в app/img
-
----
-**Используемые по модули**
-
-```js
 var gulp         = require('gulp'), // Подключаем Gulp
     browserSync  = require('browser-sync'), // Подключаем Browser Sync
     concat       = require('gulp-concat'), // Подключаем gulp-concat (для конкатенации файлов)
@@ -81,14 +8,41 @@ var gulp         = require('gulp'), // Подключаем Gulp
     pngquant     = require('imagemin-pngquant'), // Подключаем библиотеку для работы с png
     cache        = require('gulp-cache'), // Подключаем библиотеку кеширования
     autoprefixer = require('gulp-autoprefixer'),// Подключаем библиотеку для автоматического добавления префиксов
-    spritesmith = require('gulp.spritesmith'), // Подключение библиотеки для создания спрайтов
-    merge = require('merge-stream');
+    spritesmith  = require('gulp.spritesmith'), // Подключение библиотеки для создания спрайтов
+    sass         = require('gulp-sass'),
+    merge        = require('merge-stream'),
+    iconfont     = require('gulp-iconfont'),
+    consolidate  = require('gulp-consolidate'),
+    async        = require('async');
 
-```
-**Все таски gulp file**
 
+gulp.task('iconfont', function(done){
 
-```js
+    var iconStream = gulp.src(['src/icons/*.svg'])
+        .pipe(iconfont({ fontName: 'app-ic' }));
+
+    async.parallel([
+        function handleGlyphs (cb) {
+            iconStream.on('glyphs', function(glyphs, options) {
+                gulp.src('src/templates/myfont.css')
+                    .pipe(consolidate('lodash', {
+                        glyphs: glyphs,
+                        fontName: 'app-ic',
+                        fontPath: '../fonts/',
+                        className: 'icon'
+                    }))
+                    .pipe(gulp.dest('app/css/'))
+                    .on('finish', cb);
+            });
+        },
+        function handleFonts (cb) {
+            iconStream
+                .pipe(gulp.dest('app/fonts/'))
+                .on('finish', cb);
+        }
+    ], done);
+
+});
 
 gulp.task('css', function(){ // Создаем таск Sass
     return gulp.src('src/css/**/*.css') // Берем источник
@@ -99,7 +53,7 @@ gulp.task('css', function(){ // Создаем таск Sass
 
 gulp.task('sass', function () {
     gulp.src('src/scss/**/*.scss')
-        .pipe(sass({outputStyle: 'compressed'}).on('error', sass.logError))
+        .pipe(sass().on('error', sass.logError))
         .pipe(autoprefixer(['last 15 versions', '> 1%', 'ie 8', 'ie 7'], { cascade: true }))
         .pipe(gulp.dest('app/css'))
 }) ;
@@ -143,13 +97,16 @@ gulp.task('css-libs', ['css'], function() {
         .pipe(gulp.dest('app/css')); // Выгружаем в папку app/css
 });
 
-gulp.task('watch', ['browser-sync', 'css', 'scripts', 'sprite', 'sass'], function() {
+gulp.task('watch', ['browser-sync', 'css', 'scripts', 'sprite', 'sass', 'iconfont'], function() {
     // gulp.watch('src/css/**/*.css', ['css']); // Наблюдение за css файлами в папке css
     gulp.watch('src/scss/**/*.scss', ['sass']);
+    gulp.watch('src/icons/*.svg', ['iconfont']);
     gulp.watch('src/sprite/*.png', ['sprite']); // Наблюдение за папкой с картинками для спрайтов  папке sprite
     gulp.watch('app/*.html', browserSync.reload); // Наблюдение за HTML файлами в корне проекта
     gulp.watch('app/js/**/*.js', browserSync.reload);   // Наблюдение за JS файлами в папке js
-    gulp.watch('app/js/**/*.js', ['scripts']);   // Наблюдение за JS файлами в папке js
+    gulp.watch('src/scss/**/*.scss', browserSync.reload);   // Наблюдение за JS файлами в папке js
+    gulp.watch('src/icons/*.svg', browserSync.reload);   // Наблюдение за JS файлами в папке js
+    gulp.watch('src/js/**/*.js', ['scripts']);   // Наблюдение за JS файлами в папке js
 });
 
 gulp.task('img', function() {
@@ -169,5 +126,3 @@ gulp.task('clear', function () {
 });
 
 gulp.task('default', ['watch']);
-
-```
